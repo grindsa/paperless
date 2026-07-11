@@ -1,0 +1,68 @@
+services:
+  broker:
+    image: docker.io/library/redis:7
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    networks:
+      - paperless-internal
+
+  db:
+    image: docker.io/library/mariadb:11
+    restart: unless-stopped
+    volumes:
+      - dbdata:/var/lib/mysql
+    env_file:
+      - .env
+    environment:
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+    networks:
+      - paperless-internal
+
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    restart: unless-stopped
+    depends_on:
+      - db
+      - broker
+    volumes:
+      - ${PAPERLESS_DATA_DIR}:/usr/src/paperless/data
+      - ${PAPERLESS_MEDIA_DIR}:/usr/src/paperless/media
+      - ${PAPERLESS_EXPORT_DIR}:/usr/src/paperless/export
+      - ${PAPERLESS_CONSUME_DIR}:/usr/src/paperless/consume
+    env_file:
+      - .env
+    environment:
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBENGINE: mariadb
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBUSER: ${MARIADB_USER}
+      PAPERLESS_DBPASS: ${MARIADB_PASSWORD}
+      PAPERLESS_DBPORT: ${PAPERLESS_DBPORT}
+      PAPERLESS_URL: ${PAPERLESS_URL}
+      PAPERLESS_ALLOWED_HOSTS: ${PAPERLESS_ALLOWED_HOSTS}
+      PAPERLESS_CSRF_TRUSTED_ORIGINS: ${PAPERLESS_CSRF_TRUSTED_ORIGINS}
+      PAPERLESS_TRUSTED_PROXIES: ${PAPERLESS_TRUSTED_PROXIES}
+      PAPERLESS_USE_X_FORWARD_HOST: ${PAPERLESS_USE_X_FORWARD_HOST}
+      USERMAP_UID: ${USERMAP_UID}
+      USERMAP_GID: ${USERMAP_GID}
+    networks:
+      - proxy
+      - paperless-internal
+    # If behind Caddy, do not publish 8000 publicly.
+    # If you need temporary direct debugging, uncomment:
+    # ports:
+    #   - "127.0.0.1:8000:8000"
+
+volumes:
+  dbdata:
+  redisdata:
+
+networks:
+  proxy:
+    external: true
+  paperless-internal:
+    internal: true

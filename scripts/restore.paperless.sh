@@ -221,21 +221,51 @@ if [ "$FROM_REMOTE_LATEST" -eq 1 ]; then
     ssh_opts="-i $SSH_KEY"
   fi
 
-  echo "Fetching backup archives from $REMOTE_TARGET:$REMOTE_DIR_NORM via scp"
+  echo "Resolving latest backup archive on $REMOTE_TARGET:$REMOTE_DIR_NORM"
+  remote_glob_primary="'$REMOTE_DIR_NORM'/${APP_NAME}-backup-*.tar.gz"
+  remote_glob_synology=""
+  case "$REMOTE_DIR_NORM" in
+    /volume1/*)
+      ;;
+    *)
+      remote_glob_synology="'/volume1$REMOTE_DIR_NORM'/${APP_NAME}-backup-*.tar.gz"
+      ;;
+  esac
+
+  if [ -n "$remote_glob_synology" ]; then
+    # shellcheck disable=SC2086
+    latest_remote_archive="$(ssh $ssh_opts "$REMOTE_TARGET" "ls -1dt $remote_glob_primary $remote_glob_synology 2>/dev/null | head -n 1")"
+  else
+    # shellcheck disable=SC2086
+    latest_remote_archive="$(ssh $ssh_opts "$REMOTE_TARGET" "ls -1dt $remote_glob_primary 2>/dev/null | head -n 1")"
+  fi
+
+  if [ -z "$latest_remote_archive" ]; then
+    echo "ERROR: no backup archives found at $REMOTE_TARGET:$REMOTE_DIR_NORM" >&2
+    exit 1
+  fi
+
+  echo "Fetching latest backup: $latest_remote_archive"
   # shellcheck disable=SC2086
-  if ! scp $ssh_opts "$REMOTE_TARGET:$REMOTE_DIR_NORM/${APP_NAME}-backup-*.tar.gz" "$work_dir/"; then
-    echo "ERROR: unable to fetch backup archives from $REMOTE_TARGET:$REMOTE_DIR_NORM" >&2
-    exit 1
+  if ! scp $ssh_opts "$REMOTE_TARGET:$latest_remote_archive" "$work_dir/"; then
+    case "$latest_remote_archive" in
+      /volume1/*)
+        latest_remote_archive_scp="${latest_remote_archive#/volume1}"
+        echo "Retrying fetch without /volume1 prefix: $latest_remote_archive_scp"
+        # shellcheck disable=SC2086
+        if ! scp $ssh_opts "$REMOTE_TARGET:$latest_remote_archive_scp" "$work_dir/"; then
+          echo "ERROR: unable to fetch latest backup archive from $REMOTE_TARGET" >&2
+          exit 1
+        fi
+        ;;
+      *)
+        echo "ERROR: unable to fetch latest backup archive from $REMOTE_TARGET" >&2
+        exit 1
+        ;;
+    esac
   fi
 
-  latest_local_archive="$(find "$work_dir" -maxdepth 1 -type f -name "${APP_NAME}-backup-*.tar.gz" -print | sort | tail -n 1)"
-  if [ -z "$latest_local_archive" ]; then
-    echo "ERROR: no backup archives were downloaded from $REMOTE_TARGET:$REMOTE_DIR_NORM" >&2
-    exit 1
-  fi
-
-  echo "Using latest downloaded backup: $(basename "$latest_local_archive")"
-  archive_path="$latest_local_archive"
+  archive_path="$work_dir/$(basename "$latest_remote_archive")"
 fi
 
 if [ ! -f "$archive_path" ]; then

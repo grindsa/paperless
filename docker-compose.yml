@@ -21,10 +21,6 @@ services:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
     networks:
       - paperless-internal
-    # If behind Caddy, do not publish 8000 publicly.
-    # If you need temporary direct debugging, uncomment:
-    # ports:
-    #   - "8000:8000"
   paperless:
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
     restart: unless-stopped
@@ -58,7 +54,7 @@ services:
     # If behind Caddy, do not publish 8000 publicly.
     # If you need temporary direct debugging, uncomment:
     # ports:
-    #   - "127.0.0.1:8000:8000"
+    #   - "8000:8000"
 
 volumes:
   dbdata:

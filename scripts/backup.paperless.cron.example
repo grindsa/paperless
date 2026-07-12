@@ -1,6 +1,6 @@
-# paperless backup schedule (2nd Friday each month at 02:30)
+# paperless backup schedule (every Friday at 02:30)
 # Cron expression explanation:
-#   minute=30 hour=2 day=8-14 month=* weekday=5 (Friday)
+#   minute=30 hour=2 day=* month=* weekday=5 (Friday)
 #
 # Required setup:
 # - Configure backup variables in /srv/stacks/paperless/.env
@@ -9,5 +9,5 @@
 #   (optional override variables: WA_NOTIFY_NUMBER, WA_NOTIFY_SRV, WA_NOTIFY_PORT)
 # - WA send path uses host python binary defined via WA_PYTHON_BIN
 
-# Run backup
-30 2 8-14 * 5 cd /srv/stacks/paperless && ./scripts/backup.paperless.sh >> /srv/stacks/paperless/logs/backup-paperless-cron.log 2>&1
+# Run backup every Friday
+30 2 * * 5 root cd /srv/stacks/paperless && ./scripts/backup.paperless.sh >> /srv/stacks/paperless/logs/backup-paperless-cron.log 2>&1

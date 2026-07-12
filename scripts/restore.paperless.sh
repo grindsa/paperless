@@ -221,18 +221,21 @@ if [ "$FROM_REMOTE_LATEST" -eq 1 ]; then
     ssh_opts="-i $SSH_KEY"
   fi
 
-  echo "Resolving latest backup on $REMOTE_TARGET:$REMOTE_DIR_NORM"
+  echo "Fetching backup archives from $REMOTE_TARGET:$REMOTE_DIR_NORM via scp"
   # shellcheck disable=SC2086
-  latest_remote_archive="$(ssh $ssh_opts "$REMOTE_TARGET" "ls -1dt '$REMOTE_DIR_NORM'/${APP_NAME}-backup-*.tar.gz 2>/dev/null | head -n 1")"
-  if [ -z "$latest_remote_archive" ]; then
-    echo "ERROR: no backup archives found at $REMOTE_TARGET:$REMOTE_DIR_NORM" >&2
+  if ! scp $ssh_opts "$REMOTE_TARGET:$REMOTE_DIR_NORM/${APP_NAME}-backup-*.tar.gz" "$work_dir/"; then
+    echo "ERROR: unable to fetch backup archives from $REMOTE_TARGET:$REMOTE_DIR_NORM" >&2
     exit 1
   fi
 
-  echo "Fetching latest backup: $latest_remote_archive"
-  # shellcheck disable=SC2086
-  scp $ssh_opts "$REMOTE_TARGET:$latest_remote_archive" "$work_dir/"
-  archive_path="$work_dir/$(basename "$latest_remote_archive")"
+  latest_local_archive="$(find "$work_dir" -maxdepth 1 -type f -name "${APP_NAME}-backup-*.tar.gz" -print | sort | tail -n 1)"
+  if [ -z "$latest_local_archive" ]; then
+    echo "ERROR: no backup archives were downloaded from $REMOTE_TARGET:$REMOTE_DIR_NORM" >&2
+    exit 1
+  fi
+
+  echo "Using latest downloaded backup: $(basename "$latest_local_archive")"
+  archive_path="$latest_local_archive"
 fi
 
 if [ ! -f "$archive_path" ]; then
